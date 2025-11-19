@@ -3,7 +3,7 @@ import json
 import time
 import requests 
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
 channel = connection.channel()
 channel.queue_declare(queue='alertas_cuenca')
 
@@ -55,3 +55,4 @@ def callback(ch, method, properties, body):
 
 channel.basic_consume(queue='alertas_cuenca', on_message_callback=callback, auto_ack=True)
 channel.start_consuming()
+
