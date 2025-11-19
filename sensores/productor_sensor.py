@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 
 # 1. Configuración de conexión a RabbitMQ
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
 channel = connection.channel()
 channel.queue_declare(queue='alertas_cuenca') # Creamos la cola
 
@@ -51,3 +51,4 @@ try:
 except KeyboardInterrupt:
     print("\n Apagando sensores...")
     connection.close()
+
