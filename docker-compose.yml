@@ -1,8 +1,52 @@
 services:
+  # 1. El Broker de Mensajería
   rabbitmq:
     image: rabbitmq:4-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # Puerto para que Python se conecte (pika)
-      - "15672:15672" # Puerto para entrar a la web de administración
-    restart: always
+      - "5672:5672"   # Puerto mensajería
+      - "15672:15672" # Puerto panel web
+    healthcheck:      # Verifica que RabbitMQ esté listo antes de iniciar los scripts
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - red_cuenca
+
+  # 2. El Productor (Sensores)
+  productor:
+    image: python:3.9-slim
+    container_name: productor_sensores
+    working_dir: /app
+    volumes:
+      - ./sensores:/app  # Conecta tu carpeta local con el contenedor
+    # El comando instala dependencias y luego corre el script
+    # 'python -u' es importante para ver los logs en tiempo real
+    command: >
+      sh -c "pip install pika && python -u productor_sensor.py"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - red_cuenca
+
+  # 3. El Consumidor (Procesador)
+  procesador:
+    image: python:3.9-slim
+    container_name: procesador_alertas
+    working_dir: /app
+    volumes:
+      - ./consumidores:/app
+    command: >
+      sh -c "pip install pika requests && python -u procesador_alertas.py"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - red_cuenca
+
+# Definimos una red interna para que se vean entre ellos
+networks:
+  red_cuenca:
+    driver: bridge
