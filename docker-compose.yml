@@ -1,0 +1,8 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # Puerto para que Python se conecte (pika)
+      - "15672:15672" # Puerto para entrar a la web de administración
+    restart: always
