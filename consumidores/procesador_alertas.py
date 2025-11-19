@@ -1,58 +1,81 @@
 import pika
 import json
-import time
-import requests 
+import asyncio
+import websockets
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+# URL del servidor WebSocket
+WS_URL = "ws://localhost:9000"
+
+# Conexión a RabbitMQ
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 channel = connection.channel()
 channel.queue_declare(queue='alertas_cuenca')
 
-# URL del servidor de tu compañero (Persona 2).
-# Por ahora apuntamos a localhost puerto 9000, que es lo que pedía el ejercicio.
-URL_DESTINO = "http://localhost:9000/api/alerta"
+print("Procesador activo. Esperando mensajes...")
 
-print("Esperando alertas y reenviando...")
+# --- Función para enviar la alerta al servidor WebSocket ---
+async def enviar_ws(alerta):
+    try:
+        async with websockets.connect(WS_URL) as ws:
+            await ws.send(json.dumps(alerta))
+    except Exception as e:
+        print("❌ No se pudo enviar al WebSocket:", e)
+        print("Dato procesado localmente:", alerta)
 
+# --- Callback que se ejecuta por cada mensaje de RabbitMQ ---
 def callback(ch, method, properties, body):
-    mensaje_recibido = json.loads(body)
-    
-  
-    tipo = mensaje_recibido["tipo"]
-    valor = mensaje_recibido["valor"]
-    sensor = mensaje_recibido["sensor_id"]
-    
+    mensaje = json.loads(body)
+
+    sensor = mensaje["sensor_id"]
+    tipo = mensaje["tipo"]
+    valor = mensaje["valor"]
+
+    # --- Clasificación de alerta ---
     alerta_procesada = {
         "alerta": "Evento Normal",
-        "nivel": "verde", 
+        "nivel": "verde",
         "mensaje": f"Sensor {sensor} operando normalmente",
-        "timestamp": mensaje_recibido["timestamp"]
+        "sensor_id": sensor,
+        "timestamp": mensaje["timestamp"]
     }
 
     if tipo == "temperatura":
         if valor > 45:
-            alerta_procesada.update({"alerta": "🔥 CALOR CRÍTICO", "nivel": "rojo", "mensaje": f"¡Peligro! {valor}°C en {sensor}"})
+            alerta_procesada.update({
+                "alerta": "🔥 CALOR CRÍTICO",
+                "nivel": "rojo",
+                "mensaje": f"¡Peligro! {valor}°C en {sensor}"
+            })
         elif valor > 35:
-            alerta_procesada.update({"alerta": "⚠️ Advertencia Calor", "nivel": "amarillo", "mensaje": f"Subiendo temp: {valor}°C"})
-
+            alerta_procesada.update({
+                "alerta": "⚠️ Advertencia Calor",
+                "nivel": "amarillo",
+                "mensaje": f"Subiendo temperatura: {valor}°C"
+            })
     elif tipo == "humo" and valor == 1:
-        alerta_procesada.update({"alerta": "🚨 INCENDIO DETECTADO", "nivel": "rojo", "mensaje": f"Humo en sensor {sensor}"})
-
+        alerta_procesada.update({
+            "alerta": "🚨 INCENDIO DETECTADO",
+            "nivel": "rojo",
+            "mensaje": f"Humo detectado en sensor {sensor}"
+        })
     elif tipo == "puerta" and valor == "abierta":
-         alerta_procesada.update({"alerta": "🚪 Puerta Abierta", "nivel": "amarillo", "mensaje": f"Acceso en {sensor}"})
+        alerta_procesada.update({
+            "alerta": "🚪 Puerta Abierta",
+            "nivel": "amarillo",
+            "mensaje": f"Acceso en {sensor}"
+        })
+    elif tipo == "movimiento" and valor == "detectado":
+        alerta_procesada.update({
+            "alerta": "👀 Movimiento Detectado",
+            "nivel": "amarillo",
+            "mensaje": f"Movimiento en {sensor}"
+        })
 
-    try:
-        # Enviamos el JSON procesado al servidor 
-        respuesta = requests.post(URL_DESTINO, json=alerta_procesada)
-    
-        if respuesta.status_code == 200:
-            print(f"✅ Enviado a Websocket: {alerta_procesada['alerta']}")
-        else:
-            print(f"⚠️ Error al enviar: Servidor respondió {respuesta.status_code}")
-            
-    except requests.exceptions.ConnectionError:
-        print(f"❌ No se pudo conectar con el Servidor WebSocket")
-        print(f"   --> Dato procesado localmente: {alerta_procesada['alerta']}")
+    # --- Enviar la alerta al WebSocket ---
+    asyncio.run(enviar_ws(alerta_procesada))
 
+    print(f"✅ Procesado y enviado: {alerta_procesada['alerta']}")
+
+# --- Consumir mensajes de RabbitMQ ---
 channel.basic_consume(queue='alertas_cuenca', on_message_callback=callback, auto_ack=True)
 channel.start_consuming()
-

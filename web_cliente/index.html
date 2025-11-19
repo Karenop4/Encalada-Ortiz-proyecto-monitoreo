@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Centro de Control</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; }
+        .alerta { padding: 10px; margin: 10px; border-radius: 5px; color: white; }
+        .rojo { background: #e74c3c; }
+        .amarillo { background: #f1c40f; color: black; }
+        .verde { background: #2ecc71; }
+    </style>
+</head>
+<body>
+    <h1>Centro de Control - Alertas en Tiempo Real</h1>
+    <div id="alertas"></div>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:9000");
+        const contenedor = document.getElementById("alertas");
+
+        ws.onopen = () => console.log("Conectado al servidor WebSocket");
+
+        ws.onmessage = (evento) => {
+            const alerta = JSON.parse(evento.data);
+
+            // Crear elemento de alerta
+            const div = document.createElement("div");
+            div.className = "alerta " + alerta.nivel;
+            div.innerHTML = `
+                <strong>${alerta.alerta}</strong><br>
+                ${alerta.mensaje}<br>
+                Sensor: ${alerta.sensor_id} <br>
+                Hora: ${alerta.timestamp}
+            `;
+
+            // Añadir al contenedor
+            contenedor.prepend(div);
+        };
+
+        ws.onclose = () => console.log("Conexión WebSocket cerrada");
+    </script>
+</body>
+</html>
