@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Dashboard Centro de Control</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f0f0f0; }
-        .alerta { padding: 10px; margin: 10px; border-radius: 5px; color: white; }
-        .rojo { background: #e74c3c; }
-        .amarillo { background: #f1c40f; color: black; }
-        .verde { background: #2ecc71; }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Centro de Control - Alertas en Tiempo Real</h1>
-    <div id="alertas"></div>
+    <header>
+        <h1>Centro de Control - Alertas en Tiempo Real</h1>
+    </header>
+    <main>
+        <div id="alertas"></div>
+    </main>
 
     <script>
         const ws = new WebSocket("ws://localhost:9000");
@@ -24,17 +22,14 @@
         ws.onmessage = (evento) => {
             const alerta = JSON.parse(evento.data);
 
-            // Crear elemento de alerta
             const div = document.createElement("div");
             div.className = "alerta " + alerta.nivel;
             div.innerHTML = `
-                <strong>${alerta.alerta}</strong><br>
-                ${alerta.mensaje}<br>
-                Sensor: ${alerta.sensor_id} <br>
-                Hora: ${alerta.timestamp}
+                <div class="titulo">${alerta.alerta}</div>
+                <div class="mensaje">${alerta.mensaje}</div>
+                <div class="detalles">Sensor: ${alerta.sensor_id} | Hora: ${alerta.timestamp}</div>
             `;
 
-            // Añadir al contenedor
             contenedor.prepend(div);
         };
 
