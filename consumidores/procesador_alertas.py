@@ -3,11 +3,11 @@ import json
 import asyncio
 import websockets
 
-# URL del servidor WebSocket
-WS_URL = "ws://localhost:9000"
+# URL del servidor WebSocket (Debe coincidir con el nombre del servicio en docker-compose)
+WS_URL = "ws://websocket:9000"
 
 # Conexión a RabbitMQ
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
 channel = connection.channel()
 channel.queue_declare(queue='alertas_cuenca')
 
@@ -18,9 +18,9 @@ async def enviar_ws(alerta):
     try:
         async with websockets.connect(WS_URL) as ws:
             await ws.send(json.dumps(alerta))
+            print(f"📡 Enviado al WS: {alerta['alerta']}")
     except Exception as e:
-        print("❌ No se pudo enviar al WebSocket:", e)
-        print("Dato procesado localmente:", alerta)
+        print(f" Error conectando al WS: {e}")
 
 # --- Callback que se ejecuta por cada mensaje de RabbitMQ ---
 def callback(ch, method, properties, body):
@@ -39,42 +39,24 @@ def callback(ch, method, properties, body):
         "timestamp": mensaje["timestamp"]
     }
 
+    # LÓGICA DE NEGOCIO
     if tipo == "temperatura":
         if valor > 45:
-            alerta_procesada.update({
-                "alerta": "🔥 CALOR CRÍTICO",
-                "nivel": "rojo",
-                "mensaje": f"¡Peligro! {valor}°C en {sensor}"
-            })
+            alerta_procesada.update({"alerta": " CALOR CRÍTICO", "nivel": "rojo", "mensaje": f"¡Peligro! {valor}°C"})
         elif valor > 35:
-            alerta_procesada.update({
-                "alerta": "⚠️ Advertencia Calor",
-                "nivel": "amarillo",
-                "mensaje": f"Subiendo temperatura: {valor}°C"
-            })
+            alerta_procesada.update({"alerta": " Advertencia Calor", "nivel": "amarillo", "mensaje": f"Temp: {valor}°C"})
     elif tipo == "humo" and valor == 1:
-        alerta_procesada.update({
-            "alerta": "🚨 INCENDIO DETECTADO",
-            "nivel": "rojo",
-            "mensaje": f"Humo detectado en sensor {sensor}"
-        })
+        alerta_procesada.update({"alerta": " INCENDIO", "nivel": "rojo", "mensaje": "Humo detectado"})
     elif tipo == "puerta" and valor == "abierta":
-        alerta_procesada.update({
-            "alerta": "🚪 Puerta Abierta",
-            "nivel": "amarillo",
-            "mensaje": f"Acceso en {sensor}"
-        })
+        alerta_procesada.update({"alerta": " Puerta Abierta", "nivel": "amarillo", "mensaje": "Acceso no autorizado"})
     elif tipo == "movimiento" and valor == "detectado":
-        alerta_procesada.update({
-            "alerta": "👀 Movimiento Detectado",
-            "nivel": "amarillo",
-            "mensaje": f"Movimiento en {sensor}"
-        })
+        alerta_procesada.update({"alerta": " Movimiento", "nivel": "amarillo", "mensaje": "Movimiento detectado"})
 
     # --- Enviar la alerta al WebSocket ---
-    asyncio.run(enviar_ws(alerta_procesada))
-
-    print(f"✅ Procesado y enviado: {alerta_procesada['alerta']}")
+    try:
+        asyncio.run(enviar_ws(alerta_procesada))
+    except Exception as e:
+        print(f"Error en loop asíncrono: {e}")
 
 # --- Consumir mensajes de RabbitMQ ---
 channel.basic_consume(queue='alertas_cuenca', on_message_callback=callback, auto_ack=True)
