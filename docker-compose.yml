@@ -14,10 +14,10 @@ services:
       - red_cuenca
 
   productor:
-    build: ./sensores       # <--- AQUÍ ESTÁ EL CAMBIO: Construye desde la carpeta
+    build: ./sensores      
     container_name: productor_sensores
     volumes:
-      - ./sensores:/app     # Mantenemos esto para que si editas código, se actualice sin reconstruir
+      - ./sensores:/app     
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -25,7 +25,7 @@ services:
       - red_cuenca
 
   procesador:
-    build: ./consumidores   # <--- AQUÍ ESTÁ EL CAMBIO
+    build: ./consumidores   
     container_name: procesador_alertas
     volumes:
       - ./consumidores:/app
@@ -34,7 +34,13 @@ services:
         condition: service_healthy
     networks:
       - red_cuenca
-
+  websocket:
+    build: ./websocket_server
+    container_name: websocket_server
+    ports:
+      - "9000:9000"
+    networks:
+      - red_cuenca
 networks:
   red_cuenca:
     driver: bridge
